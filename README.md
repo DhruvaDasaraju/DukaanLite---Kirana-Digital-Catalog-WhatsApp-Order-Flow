@@ -1,5 +1,7 @@
 # Dukan Lite — Kirana digital catalog & WhatsApp order flow
 
+[![Live demo](https://img.shields.io/badge/%E2%96%B6%20Live%20demo-open%20the%20website-22c55e?style=for-the-badge)](https://dhruvadasaraju.github.io/DukaanLite---Kirana-Digital-Catalog-WhatsApp-Order-Flow/)
+
 A working, responsive web app built from the *DukaanLite* UI/UX deck (PRD v1.0 · PST_PD_098).
 Customers browse a kirana store's catalog, build a cart and send the order on WhatsApp. The shopkeeper
 tracks it on an orders board, and the delivery person packs it with a checklist and marks it delivered.
@@ -7,6 +9,11 @@ tracks it on an orders board, and the delivery person packs it with a checklist 
 Front end: plain HTML/CSS/JS with [GSAP](https://gsap.com) (ScrollTrigger + Flip). Back end: Node.js + Express +
 **MongoDB**. All shop data lives in the MongoDB database **`mangoes`**, so every phone and laptop sees the same
 products and orders, with live updates.
+
+> **Live demo:** [dhruvadasaraju.github.io/DukaanLite---Kirana-Digital-Catalog-WhatsApp-Order-Flow](https://dhruvadasaraju.github.io/DukaanLite---Kirana-Digital-Catalog-WhatsApp-Order-Flow/).
+> It runs on GitHub Pages without the server, so the shop keeps its data in your own browser (orders don't sync
+> between devices there). Try **Shop**, then **Shopkeeper → Orders board** in another tab. For shared, live orders
+> across devices, run it with the server as below.
 
 ## Run it
 
