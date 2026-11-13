@@ -247,6 +247,17 @@
     if (hooks.onCart) hooks.onCart(id);
   }
 
+  /* Send a change to the MongoDB server. On failure: say why, then reload the real data. */
+  function save(method, path, body) {
+    if (store.mode() !== 'server') return Promise.resolve(null);
+    return store.api(method, path, body).catch(async (err) => {
+      toast(err.message, 'error');
+      try { await store.refresh(); } catch (e) { /* offline */ }
+      if (hooks.onRemote) hooks.onRemote(); else rerender();
+      return null;
+    });
+  }
+
   let lastBadge = null;
   function updateBadge() {
     const n = cartCount();
@@ -255,6 +266,7 @@
     badge.classList.toggle('is-empty', n === 0);
     $('#cartBtn').setAttribute('aria-label', `Cart, ${n} item${n === 1 ? '' : 's'}`);
     if (lastBadge !== null && n !== lastBadge) bump(badge);
+    if (lastBadge !== null && n > lastBadge && typeof logoCheer === 'function') logoCheer();
     lastBadge = n;
   }
 
@@ -311,7 +323,11 @@
     }
     if (modal.open) { modal.close(); modal.innerHTML = ''; }
     if (current) {
-      await gsap.to(view, { opacity: 0, duration: 0.18, ease: 'power1.in' });
+      // don't let navigation hang if animation frames are paused (e.g. a background tab)
+      await Promise.race([
+        gsap.to(view, { opacity: 0, duration: 0.18, ease: 'power1.in' }),
+        new Promise((r) => setTimeout(r, 250)),
+      ]);
       if (token !== navToken) return;
     }
     teardown();
@@ -362,6 +378,148 @@
   const onScroll = () => nav.classList.toggle('scrolled', window.scrollY > 8);
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
+
+  /* =========================================================
+     ANIMATED LOGO — a little kirana shop front:
+     striped awning on top, a "D"-shaped door that swings open,
+     a green handle that shows whether the shop is open.
+     ========================================================= */
+  const logos = [];
+  const logoSVG = (uid) => `
+    <svg class="logo-svg" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+      <defs>
+        <radialGradient id="logoGlow${uid}" cx="30%" cy="45%" r="75%">
+          <stop offset="0" stop-color="#86EFAC"/><stop offset=".55" stop-color="#22C55E"/><stop offset="1" stop-color="#15803D"/>
+        </radialGradient>
+        <clipPath id="logoClip${uid}"><rect width="48" height="48" rx="13"/></clipPath>
+      </defs>
+      <g clip-path="url(#logoClip${uid})">
+        <rect class="logo-tile" width="48" height="48" rx="13"/>
+        <rect class="logo-shine" x="-30" y="-10" width="14" height="70"/>
+        <path class="logo-inside" d="M15 23h8a9 8.5 0 0 1 0 17h-8Z" fill="url(#logoGlow${uid})"/>
+        <g class="logo-door">
+          <path class="logo-door-face" d="M15 23h8a9 8.5 0 0 1 0 17h-8Z"/>
+          <circle class="logo-knob" cx="26.5" cy="31.5" r="1.8"/>
+        </g>
+        <g class="logo-awning">
+          ${[0, 1, 2, 3].map((i) => `<path class="logo-stripe ${i % 2 ? 'alt' : ''}" d="M${6 + i * 9} 8h9v7a4.5 4.5 0 0 1-9 0Z"/>`).join('')}
+        </g>
+        <g class="logo-sparks">
+          <circle cx="39" cy="24" r="1.5"/><circle cx="41.5" cy="30" r="1"/><circle cx="37" cy="36" r="1.2"/>
+        </g>
+      </g>
+    </svg>`;
+
+  function splitLetters(el) {
+    const wrap = (t) => [...t].map((c) => `<span class="ltr">${c === ' ' ? '&nbsp;' : esc(c)}</span>`).join('');
+    el.innerHTML = [...el.childNodes].map((n) => (n.nodeType === 3 ? wrap(n.textContent) : `<b>${wrap(n.textContent)}</b>`)).join('');
+  }
+
+  function initLogos() {
+    $$('.brand').forEach((brand, i) => {
+      const mark = $('.brand-mark', brand);
+      const name = $('.brand-name', brand);
+      if (!mark || !name) return;
+      if (!brand.getAttribute('aria-label')) brand.setAttribute('aria-label', 'DukaanLite home');
+      mark.innerHTML = logoSVG(i);
+      mark.classList.add('is-svg');
+      splitLetters(name);
+
+      const q = (sel) => mark.querySelectorAll(sel);
+      const stripes = q('.logo-stripe');
+      const door = q('.logo-door')[0];
+      const inside = q('.logo-inside')[0];
+      const sparks = q('.logo-sparks circle');
+      const shine = q('.logo-shine')[0];
+      const letters = $$('.ltr', name);
+      gsap.set(sparks, { scale: 0, transformOrigin: '50% 50%' });
+      gsap.set(stripes, { svgOrigin: '24 8' });
+      gsap.set(door, { svgOrigin: '15 31.5' });
+      gsap.set(shine, { rotation: 25, svgOrigin: '0 0', opacity: 0 });
+
+      // hover: awning lifts, door swings open to a green glow, sparks pop, light sweeps across
+      const open = gsap.timeline({ paused: true, defaults: { ease: 'power3.out' } })
+        .to(stripes, { y: -2.5, scaleY: 1.12, duration: 0.35, stagger: 0.05 }, 0)
+        .to(door, { scaleX: 0.16, skewY: -10, duration: 0.5, ease: 'power3.inOut' }, 0)
+        .fromTo(inside, { opacity: 0.6 }, { opacity: 1, duration: 0.4 }, 0)
+        .to(sparks, { scale: 1, x: (k) => [3, 4, 3][k], y: (k) => [-3, 0, 3][k], duration: 0.4, stagger: 0.06, ease: 'back.out(3)' }, 0.15);
+
+      const sweep = () => gsap.fromTo(shine, { x: 0, opacity: 1 }, { x: 100, duration: 0.8, ease: 'power2.inOut', onComplete: () => gsap.set(shine, { opacity: 0 }) });
+      const wave = () => gsap.fromTo(letters, { y: 0 }, {
+        keyframes: { y: [0, -5, 0] }, duration: 0.5, stagger: 0.035, ease: 'sine.inOut', overwrite: true,
+      });
+
+      // 3D tilt that follows the pointer
+      const rx = gsap.quickTo(mark, 'rotationX', { duration: 0.5, ease: 'power3.out' });
+      const ry = gsap.quickTo(mark, 'rotationY', { duration: 0.5, ease: 'power3.out' });
+
+      const logo = { brand, mark, stripes, door, sparks, letters, open, hovered: false, sweep, wave };
+      logos.push(logo);
+      if (REDUCED) return;
+
+      brand.addEventListener('mouseenter', () => { logo.hovered = true; open.play(); sweep(); wave(); });
+      brand.addEventListener('mouseleave', () => { logo.hovered = false; open.reverse(); rx(0); ry(0); });
+      brand.addEventListener('mousemove', (e) => {
+        const r = mark.getBoundingClientRect();
+        const px = (e.clientX - (r.left + r.width / 2)) / 60;
+        const py = (e.clientY - (r.top + r.height / 2)) / 60;
+        ry(gsap.utils.clamp(-1, 1, px) * 22);
+        rx(gsap.utils.clamp(-1, 1, -py) * 22);
+      });
+      // click / tap: squash & stretch + a quick "welcome" door swing
+      brand.addEventListener('pointerdown', () => {
+        gsap.timeline()
+          .to(mark, { scaleX: 1.18, scaleY: 0.82, duration: 0.1, ease: 'power2.out' })
+          .to(mark, { scaleX: 1, scaleY: 1, duration: 0.7, ease: 'elastic.out(1, 0.35)' });
+        if (!logo.hovered) logoCheer(logo);
+      });
+    });
+  }
+
+  // little celebration: door pops open and shut, sparks fly (used when something goes in the cart)
+  function logoCheer(only) {
+    if (REDUCED) return;
+    (only ? [only] : logos.slice(0, 1)).forEach((l) => {
+      if (l.hovered) { l.sweep(); return; }
+      gsap.timeline()
+        .add(() => l.open.play(0))
+        .add(() => l.open.reverse(), 0.6);
+      l.wave();
+      l.sweep();
+    });
+  }
+
+  // a gentle awning flutter now and then, so the header feels alive
+  function idleFlutter() {
+    if (REDUCED) return;
+    const l = logos[0];
+    if (l && !l.hovered && document.visibilityState === 'visible' && window.scrollY < 400) {
+      gsap.fromTo(l.stripes, { scaleY: 1 }, { keyframes: { scaleY: [1, 1.18, 0.94, 1] }, duration: 0.9, stagger: 0.07, ease: 'sine.inOut' });
+    }
+    gsap.delayedCall(gsap.utils.random(7, 11), idleFlutter);
+  }
+
+  // handle colour + tooltip reflect the shop's real opening hours
+  function updateLogoStatus() {
+    const st = shopStatus();
+    logos.forEach((l) => {
+      l.mark.classList.toggle('is-closed', !st.open);
+      l.brand.title = `${S().settings.shopName} · ${st.open ? 'Open now' : 'Closed now'}`;
+    });
+  }
+
+  function logoIntro() {
+    const l = logos[0];
+    if (!l || REDUCED) return;
+    gsap.timeline({ defaults: { ease: 'back.out(1.8)' } })
+      .from(l.mark, { scale: 0, rotation: -120, duration: 0.8 })
+      .from(l.stripes, { y: -16, opacity: 0, duration: 0.5, stagger: 0.07 }, 0.25)
+      .from(l.door, { y: 12, opacity: 0, duration: 0.5 }, 0.45)
+      .from(l.letters, { yPercent: 110, opacity: 0, duration: 0.5, stagger: 0.035, ease: 'power3.out' }, 0.3)
+      .add(() => l.sweep(), 0.9);
+  }
+
+  initLogos();
 
   // Live updates from other tabs (e.g. shop in one tab, orders board in another)
   store.onRemote(() => {
@@ -1103,8 +1261,10 @@
       }
     });
 
-    form.addEventListener('submit', (e) => {
+    let sending = false;
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (sending) return;
       const d = readForm();
       const errs = validate(d);
       showErrors(errs);
@@ -1122,15 +1282,49 @@
         shake(summaryEl);
         return;
       }
-      const order = placeOrder({ ...d, phone: normPhone(d.phone) });
-      window.open(waLink(order), '_blank', 'noopener');
-      location.hash = `#/track/${order.id}?new=1`;
+      const btn = $('#placeBtn', form);
+      const label = btn.innerHTML;
+      // open the WhatsApp tab right away (inside the click) so pop-up blockers allow it
+      const win = store.mode() === 'server' ? window.open('', '_blank') : null;
+      if (win) { try { win.opener = null; win.document.title = 'Opening WhatsApp…'; } catch (err) { /* ignore */ } }
+      sending = true;
+      btn.disabled = true;
+      btn.textContent = 'Sending order…';
+      try {
+        const order = await placeOrder({ ...d, phone: normPhone(d.phone) });
+        if (win) win.location.href = waLink(order);
+        else window.open(waLink(order), '_blank', 'noopener');
+        location.hash = `#/track/${order.id}?new=1`;
+      } catch (err) {
+        if (win) win.close();
+        toast(err.message || 'Could not place the order. Please try again.', 'error');
+        sending = false;
+        btn.disabled = false;
+        btn.innerHTML = label;
+      }
     });
 
     hooks.onRemote = () => { if (!cartLines().length) { rerender(); return; } renderLines(); renderSummary(true); };
   }
 
-  function placeOrder(d) {
+  async function placeOrder(d) {
+    if (store.mode() === 'server') {
+      // the server checks stock, re-prices every line and gives the order its number
+      const order = await store.api('POST', '/orders', {
+        name: d.name, phone: d.phone, address: d.address, note: d.note || '',
+        items: buyable().map((l) => ({ id: l.p.id, qty: l.qty })),
+      });
+      store.set((s) => {
+        s.orders = [order, ...s.orders.filter((o) => o.id !== order.id)];
+        s.myOrders = [order.id, ...(s.myOrders || []).filter((x) => x !== order.id)];
+        s.customer = { name: d.name, phone: d.phone, address: d.address };
+        const keep = {};
+        Object.entries(s.cart).forEach(([id, qty]) => { const p = s.products.find((x) => x.id === id); if (p && !p.inStock) keep[id] = qty; });
+        s.cart = keep;
+      });
+      updateBadge();
+      return order;
+    }
     let order;
     store.set((s) => {
       const items = Object.entries(s.cart)
@@ -1388,6 +1582,7 @@
       if (!sel) return;
       const id = Number(sel.closest('.ocard').dataset.id);
       store.set((s) => { const o = s.orders.find((x) => x.id === id); if (o) o.assignee = sel.value; });
+      save('PATCH', `/orders/${id}`, { assignee: sel.value });
       toast(sel.value ? `Order #${id} assigned to ${sel.value}` : `Order #${id} unassigned`, 'ok');
     });
 
@@ -1414,6 +1609,7 @@
           x.history = { ...(x.history || {}), [nextKey]: Date.now() };
           if (nextKey === 'out' || nextKey === 'delivered') x.checked = x.items.map((i) => i.id);
         });
+        save('PATCH', `/orders/${id}`, { status: nextKey });
         flipUpdate(id);
         if (nextKey === 'delivered') {
           const r = board.querySelector(`[data-id="${id}"]`)?.getBoundingClientRect();
@@ -1429,6 +1625,7 @@
           if (x.history) delete x.history[x.status];
           x.status = prevKey;
         });
+        save('PATCH', `/orders/${id}`, { status: prevKey });
         flipUpdate(id);
         toast(`Order #${id} moved back to ${STATUSES[idx - 1].label}`);
       }
@@ -1515,12 +1712,14 @@
         const v = Math.round(Number(e.target.value));
         if (!v || v < 1) { toast('Price must be at least ₹1', 'error'); e.target.value = p.price; shake(e.target.parentElement); return; }
         store.set((s) => { s.products.find((x) => x.id === id).price = v; });
+        save('PATCH', `/products/${id}`, { price: v });
         toast(`${p.name} is now ${rupee(v)}`, 'ok');
         flash(id);
       }
       if (e.target.matches('[data-stock]')) {
         const on = e.target.checked;
         store.set((s) => { s.products.find((x) => x.id === id).inStock = on; });
+        save('PATCH', `/products/${id}`, { inStock: on });
         const lbl = e.target.parentElement.lastElementChild;
         lbl.className = on ? 's-in' : 's-out';
         lbl.textContent = on ? 'In stock' : 'Out of stock';
@@ -1544,6 +1743,7 @@
           height: 0, opacity: 0, x: 60, paddingTop: 0, paddingBottom: 0, marginBottom: -10, duration: 0.4, ease: 'power2.in',
           onComplete: () => {
             store.set((s) => { s.products = s.products.filter((x) => x.id !== id); delete s.cart[id]; });
+            save('DELETE', `/products/${id}`);
             updateBadge();
             render(true);
             toast(`${p.name} deleted`);
@@ -1632,6 +1832,7 @@
             Object.assign(s.products.find((x) => x.id === id), v);
           }
         });
+        save('PUT', `/products/${id}`, S().products.find((x) => x.id === id));
         updateBadge();
         closeModal(true);
         toast(isNew ? `${v.name} added to the shop` : `${v.name} saved`, 'ok');
@@ -1708,6 +1909,7 @@
       const first = Object.keys(errs)[0];
       if (first) { shake($(`[data-field="${first}"]`, root)); $(`#${first}`, root).focus(); return; }
       store.set((s2) => { s2.settings = { ...s2.settings, ...v }; s2.staff = staff; });
+      save('PUT', '/settings', { settings: S().settings, staff });
       toast('Settings saved', 'ok');
       gsap.fromTo('.admin-top h1', { color: '#15803D' }, { color: '#0A0A0A', duration: 1 });
     });
@@ -1719,7 +1921,7 @@
     $('#resetDemo', root).addEventListener('click', async () => {
       const ok = await confirmModal({ title: 'Reset demo data?', text: 'All products, orders, cart and settings in this browser go back to the sample data. This cannot be undone.', ok: 'Reset everything', danger: true });
       if (!ok) return;
-      store.reset();
+      try { await store.reset(); } catch (err) { toast(err.message, 'error'); return; }
       updateBadge();
       rerender();
       toast('Demo data restored', 'ok');
@@ -1785,6 +1987,7 @@
         if (input.checked) set.add(itemId); else set.delete(itemId);
         o.checked = [...set];
       });
+      save('PATCH', `/orders/${id}`, { checked: S().orders.find((x) => x.id === id).checked });
       const label = input.closest('.check');
       label.classList.toggle('checked', input.checked);
       const path = $('path', label);
@@ -1803,10 +2006,12 @@
       const id = Number(card.dataset.id);
       if (start) {
         store.set((s2) => { const o = s2.orders.find((x) => x.id === id); o.status = 'out'; o.history = { ...(o.history || {}), out: Date.now() }; });
+        save('PATCH', `/orders/${id}`, { status: 'out' });
         toast(`On the way with #${id}`, 'ok');
         gsap.to(card, { x: 12, duration: 0.12, yoyo: true, repeat: 1, onComplete: () => rerender() });
       } else {
         store.set((s2) => { const o = s2.orders.find((x) => x.id === id); o.status = 'delivered'; o.history = { ...(o.history || {}), delivered: Date.now() }; });
+        save('PATCH', `/orders/${id}`, { status: 'delivered' });
         const r = done.getBoundingClientRect();
         confetti(r.left + r.width / 2, r.top);
         toast(`Order #${id} delivered. Great job, ${rider}!`, 'ok');
@@ -1909,7 +2114,18 @@
   }
 
   /* ---------- boot ---------- */
-  updateBadge();
-  window.addEventListener('hashchange', router);
-  router();
+  store.onStatus((isOnline) => {
+    if (isOnline) toast('Back online. Data is up to date.', 'ok');
+    else toast('Connection to the shop server lost. Retrying…', 'error');
+  });
+  view.innerHTML = '<div class="page container"><p class="muted loading">Loading the shop…</p></div>';
+  store.ready.then(() => {
+    updateLogoStatus();
+    setInterval(updateLogoStatus, 60000);
+    logoIntro();
+    gsap.delayedCall(6, idleFlutter);
+    updateBadge();
+    window.addEventListener('hashchange', router);
+    router();
+  });
 })();

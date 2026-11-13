@@ -1,0 +1,20 @@
+{
+  "name": "dukan-lite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Kirana digital catalog & WhatsApp order flow, backed by MongoDB (database: mangoes)",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "seed": "node server/seed.js",
+    "seed:reset": "node server/seed.js --reset",
+    "db": "mkdir -p \"$HOME/.local/mongodb/data\" && \"$HOME/.local/mongodb/bin/mongod\" --dbpath \"$HOME/.local/mongodb/data\" --bind_ip 127.0.0.1 --port 27017"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "5.2.0",
+    "mongodb": "6.21.0"
+  }
+}

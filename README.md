@@ -1,22 +1,67 @@
-# DukaanLite — Kirana digital catalog & WhatsApp order flow
+# Dukan Lite — Kirana digital catalog & WhatsApp order flow
 
 A working, responsive web app built from the *DukaanLite* UI/UX deck (PRD v1.0 · PST_PD_098).
 Customers browse a kirana store's catalog, build a cart and send the order on WhatsApp. The shopkeeper
 tracks it on an orders board, and the delivery person packs it with a checklist and marks it delivered.
 
-No build step, no backend. It's plain HTML/CSS/JS with [GSAP](https://gsap.com) (ScrollTrigger + Flip) for motion.
-Data lives in `localStorage`.
+Front end: plain HTML/CSS/JS with [GSAP](https://gsap.com) (ScrollTrigger + Flip). Back end: Node.js + Express +
+**MongoDB**. All shop data lives in the MongoDB database **`mangoes`**, so every phone and laptop sees the same
+products and orders, with live updates.
 
 ## Run it
 
+You need Node.js 20+ and MongoDB.
+
+**1. Start MongoDB** (installed at `~/.local/mongodb` on this Mac; keep this terminal open):
+
 ```bash
-node serve.mjs
+npm run db
 ```
 
-Then open http://localhost:5510. Any static host works too (GitHub Pages, Netlify, Vercel). Just upload this folder.
+**2. Start the website** (in a second terminal, inside this folder):
 
-> Tip: open the **Shop** in one tab and **Shopkeeper → Orders board** in another. Place an order and watch it land
-> on the board live (tabs sync through `localStorage` events).
+```bash
+npm install
+npm start
+```
+
+Open http://localhost:5510. On first start the server fills the `mangoes` database with the sample products,
+orders and settings automatically.
+
+> Tip: open the **Shop** in one window and **Shopkeeper → Orders board** in another (or on another device on
+> your Wi-Fi). Place an order and it appears on the board instantly.
+
+### Using MongoDB Atlas (cloud) instead
+
+Copy `.env.example` to `.env`, set `MONGODB_URI` to your Atlas connection string and keep `DB_NAME=mangoes`.
+Then run `npm run seed` once and `npm start`.
+
+### Database: `mangoes`
+
+| Collection | What it holds |
+|---|---|
+| `products` | Catalogue: name, pack size, price, category, stock, search words, photo (`_id` = `p1`, `p2`, …) |
+| `orders` | Every order: customer, address, items (priced by the server), total, status, rider, timeline, packing checklist (`_id` = order number) |
+| `settings` | One document `shop`: shop name, WhatsApp number, hours, minimum order, delivery staff |
+| `counters` | `orderId`: the last order number used |
+
+Useful commands: `npm run seed` (fill an empty database), `npm run seed:reset` (wipe and refill with sample data).
+**Shopkeeper → Settings → Reset demo data** does the same from the website.
+
+### API
+
+| Method & path | Does |
+|---|---|
+| `GET /api/state` | Products, orders, settings and staff |
+| `POST /api/orders` | Place an order. The server checks stock and minimum order and re-prices every line |
+| `PATCH /api/orders/:id` | Change status (one step at a time), rider, or packing checklist |
+| `PUT /api/products/:id` · `PATCH` · `DELETE` | Add/edit, change price or stock, delete a product |
+| `PUT /api/settings` | Shop settings and delivery staff |
+| `GET /api/events` | Live updates (Server-Sent Events) |
+
+Each phone keeps only its own cart, "My orders" list and saved delivery details in the browser.
+If the site is opened without the server (e.g. by double-clicking `public/index.html`), it falls back to
+browser-only storage.
 
 ## Pages
 
@@ -51,17 +96,23 @@ Then open http://localhost:5510. Any static host works too (GitHub Pages, Netlif
 
 ## Scope (from the deck)
 
-In: 3 demo roles, catalog, search, cart, WhatsApp handoff, local order tracking, delivery checklist, localStorage.
-Out: online payments & GST invoices, ONDC & multiple shops, real accounts / OTP, syncing orders across devices.
+In: 3 demo roles, catalog, search, cart, WhatsApp handoff, order tracking, delivery checklist, MongoDB storage with live sync across devices.
+Out: online payments & GST invoices, ONDC & multiple shops, real accounts / OTP login.
+
+> **Before going live:** the Shopkeeper and Delivery pages have no login yet, so anyone with the link can open them.
+> Add a password or OTP login before putting this on the public internet.
 
 ## Files
 
 ```
-index.html       App shell (nav, footer, toasts, modal)
-css/style.css    Design tokens (white / black / green) + all styles
-img/products/    Real product photos (see CREDITS.md)
-js/data.js       Seed products, settings, demo orders
-js/store.js      localStorage store with cross-tab sync
-js/app.js        Router, views and GSAP animations
-serve.mjs        Zero-dependency local server
+server/index.js        Express API + serves the website
+server/db.js           MongoDB connection and seeding (database: mangoes)
+server/seed.js         npm run seed / seed:reset
+public/index.html      App shell (nav, footer, toasts, modal)
+public/css/style.css   Design tokens (white / black / green) + all styles
+public/img/products/   Real product photos (see CREDITS.md)
+public/js/data.js      Sample products, settings and orders (used to seed MongoDB)
+public/js/store.js     Talks to the API, live updates, per-device cart
+public/js/app.js       Router, views and GSAP animations
+.env.example           MONGODB_URI / DB_NAME / PORT
 ```
