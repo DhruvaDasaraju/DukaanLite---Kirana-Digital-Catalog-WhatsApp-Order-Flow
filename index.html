@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DukaanLite · Your kirana, online</title>
+  <meta name="description" content="DukaanLite is a digital catalog for kirana stores. Customers browse prices and stock, build a cart and send the order on WhatsApp in under 30 seconds. The shop tracks it to Delivered.">
+  <meta name="theme-color" content="#0A0A0A">
+  <meta property="og:title" content="DukaanLite · Kirana digital catalog & WhatsApp ordering">
+  <meta property="og:description" content="Browse, build a cart, order on WhatsApp. Shopkeeper board and delivery checklist included.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='13' fill='%230A0A0A'/%3E%3Cpath d='M6 8h9v7a4.5 4.5 0 0 1-9 0Z' fill='%2322C55E'/%3E%3Cpath d='M15 8h9v7a4.5 4.5 0 0 1-9 0Z' fill='%23fff'/%3E%3Cpath d='M24 8h9v7a4.5 4.5 0 0 1-9 0Z' fill='%2322C55E'/%3E%3Cpath d='M33 8h9v7a4.5 4.5 0 0 1-9 0Z' fill='%23fff'/%3E%3Cpath d='M15 23h8a9 8.5 0 0 1 0 17h-8Z' fill='%23fff'/%3E%3Ccircle cx='26.5' cy='31.5' r='1.8' fill='%2315803D'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <a class="skip-link" href="#view">Skip to content</a>
+
+  <header class="nav" id="nav">
+    <div class="nav-inner container">
+      <a href="#/" class="brand" aria-label="DukaanLite home">
+        <span class="brand-mark">D</span><span class="brand-name">Dukaan<b>Lite</b></span>
+      </a>
+      <nav class="nav-links" id="navLinks" aria-label="Main">
+        <a href="#/shop" data-nav="shop">Shop</a>
+        <a href="#/my-orders" data-nav="my-orders">My orders</a>
+        <a href="#/orders" data-nav="admin">Shopkeeper</a>
+        <a href="#/delivery" data-nav="delivery">Delivery</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="#/cart" class="cart-btn" id="cartBtn" aria-label="Cart">
+          <svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M2.5 3h2.6l2.4 12.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.2L21 7H6"/></svg><span class="cart-btn-label">Cart</span>
+          <span class="badge is-empty" id="cartBadge" aria-live="polite">0</span>
+        </a>
+        <button class="menu-btn" id="menuBtn" aria-expanded="false" aria-controls="navLinks" aria-label="Open menu">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="view" tabindex="-1"></main>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div>
+        <a href="#/" class="brand brand-sm"><span class="brand-mark">D</span><span class="brand-name">Dukaan<b>Lite</b></span></a>
+        <p class="muted small">Kirana digital catalog &amp; WhatsApp order flow. Based on PRD v1.0 · PST_PD_098.</p>
+      </div>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="#/shop">Shop</a><a href="#/orders">Orders board</a><a href="#/products">Products</a><a href="#/delivery">Delivery</a><a href="#/settings">Settings</a>
+      </nav>
+      <p class="muted small footer-note">No accounts, no backend. Your data stays in this browser (localStorage). Payments are cash or UPI on delivery.</p>
+    </div>
+  </footer>
+
+  <div class="toasts" id="toasts" aria-live="polite" aria-atomic="false"></div>
+  <dialog class="modal" id="modal" aria-labelledby="modalTitle"></dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/Flip.min.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
